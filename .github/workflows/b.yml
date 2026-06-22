@@ -32,9 +32,9 @@ jobs:
       shell: cmd
       run: |
         xcopy /y /d "bin\*.dll" "build\"
-        xcopy /y /e "Fonts" "build\Fonts"
-        xcopy /y /e "textures" "build\textures"
-        xcopy /y /e "simpleUI Shaders" "build\simpleUI Shaders"
+        xcopy /y /e /i "Fonts" "build\Fonts"
+        xcopy /y /e /i "textures" "build\textures"
+        xcopy /y /e /i "simpleUI Shaders" "build\simpleUI Shaders"
 
     - name: Upload Build Artifact
       uses: actions/upload-artifact@v4
