@@ -331,7 +331,6 @@ void openRepositoryManagement(const std::string& name) {
 			ierarchy->deleteAllChildren();
 			ierarchy->CanvasSizeOFFSET.y = 0;
 			int maxDepth = 0;
-
 			static std::function<void(fs::path, int)> goDeep = [&maxDepth](fs::path currentPath, int depth) {
 				for (const auto& entry : fs::directory_iterator(currentPath)) {
 					TextLabel* parentalObj = new TextLabel(ierarchy);
@@ -345,9 +344,11 @@ void openRepositoryManagement(const std::string& name) {
 					parentalObj->MaxVisibleSymbols = 30;
 					parentalObj->MaxVisibleRight = true;
 					parentalObj->TextColor = (fs::is_directory(entry) ? Color{ 255, 255, 204, 255 } : Color{ 180, 180, 180, 255 });
-					parentalObj->Text = reinterpret_cast<const char*>(entry.path().filename().u8string().c_str());
+					auto u8Str = entry.path().filename().u8string();
+					parentalObj->Text = std::string(reinterpret_cast<const char*>(u8Str.data()), u8Str.size());
 
 					if (fs::is_directory(entry)) {
+						
 						goDeep(entry.path(), depth + 1);
 					}
 				}
@@ -356,7 +357,10 @@ void openRepositoryManagement(const std::string& name) {
 					maxDepth = depth;
 				}
 			};
-
+			
+			if (!directoryExists(currentRepository + "\\src")) {
+				fs::create_directory(currentRepository + "\\src");
+			}
 			goDeep(fs::path(currentRepository + "\\src"), 0);
 			ierarchy->CanvasSizeOFFSET = { 35.0f * maxDepth + 300, (float)ierarchy->Children.size() * 40 };
 		}
@@ -508,8 +512,7 @@ void openRepositoryManagement(const std::string& name) {
 					deletingRepo->Visible = false;
 					openRepositories();
 				}).detach();
-			}
-			catch (const fs::filesystem_error& e) {
+			} catch (const fs::filesystem_error& e) {
 				writeLog(currentRepository, "Error: " + std::string(e.what()) + "\n");
 			}
 		};
@@ -1182,38 +1185,33 @@ void openCreateRepository() {
 			fs::create_directory(name);
 			creatingRepo->Visible = true;
 
-			std::thread* a = new std::thread([=]() {
-				std::ofstream rpdFile(name + "\\RepoData.rpd", std::ios::out | std::ios::app);
-				if (rpdFile) {
-					rpdFile.close();
+			std::ofstream rpdFile(name + "\\RepoData.rpd", std::ios::out | std::ios::app);
+			if (rpdFile) {
+				rpdFile.close();
+			}
+
+			std::ofstream logFile(name + "\\logFile.txt", std::ios::out | std::ios::app);
+			if (logFile) {
+				logFile << "Repository created successfully\n";
+				logFile.close();
+			}
+
+			fs::create_directory(name + "\\src");
+			fs::create_directory(name + "\\pushDir");
+
+			try {
+				for (const fs::path& p : filesToCopy) {
+					fs::copy(p, name + "\\src", fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+
+					writeLog(name, "Successfully copied folder " + p.filename().string() + " recursively\n");
 				}
+			}
+			catch (const fs::filesystem_error& e) {
+				writeLog(name, "Error: " + std::string(e.what()) + "\n");
+			}
 
-				std::ofstream logFile(name + "\\logFile.txt", std::ios::out | std::ios::app);
-				if (logFile) {
-					logFile << "Repository created successfully\n";
-					logFile.close();
-				}
-
-				fs::create_directory(name + "\\src");
-				fs::create_directory(name + "\\pushDir");
-
-				try {
-					for (const fs::path& p : filesToCopy) {
-						fs::copy(p, name + "\\src", fs::copy_options::recursive | fs::copy_options::overwrite_existing);
-
-						writeLog(name, "Successfully copied folder " + p.filename().string() + " recursively\n");
-					}
-				}
-				catch (const fs::filesystem_error& e) {
-					writeLog(name, "Error: " + std::string(e.what()) + "\n");
-				}
-
-				openRepositoryManagement(name);
-				creatingRepo->Visible = false;
-				delete a;
-			});
-
-			a->detach();
+			openRepositoryManagement(name);
+			creatingRepo->Visible = false;
 		});
 	}
 
